@@ -164,6 +164,7 @@
   .field.err input{border-color:var(--danger);animation:shake .4s}
   @keyframes shake{25%{transform:translateX(-6px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
   .field .tgbtn{position:absolute;right:8px;top:8px;height:38px;padding:0 12px;border-radius:10px;background:var(--accent-soft);color:var(--accent-text);font-size:13px;font-weight:500}
+  .field input:has(+ .tgbtn:not([style*="none"])){padding-right:138px}
   .note{font-size:12px;color:var(--muted);margin-top:12px;text-align:center}
 
   /* bottom bar */
@@ -266,7 +267,7 @@
     <p class="sub st" style="--i:1">Проверьте данные и оставьте контакт</p>
     <div class="summary st" style="--i:2" id="summary"></div>
     <div class="label st" style="--i:3">Ваши данные</div>
-    <div class="field st" style="--i:4" id="fName"><input id="name" placeholder="Имя" autocomplete="name" maxlength="40"></div>
+    <div class="field st" style="--i:4" id="fName"><input id="name" placeholder="Имя" autocomplete="name" maxlength="40"><button class="tgbtn" id="tgName" type="button">👤 Из Telegram</button></div>
     <div class="field st" style="--i:5" id="fPhone"><input id="phone" type="tel" inputmode="tel" placeholder="+998 __ ___-__-__" autocomplete="tel"><button class="tgbtn" id="tgPhone" type="button">📱 Из Telegram</button></div>
     <div class="field st" style="--i:6"><textarea id="comment" placeholder="Комментарий (необязательно)" maxlength="200"></textarea></div>
     <p class="note st" style="--i:7">Администратор подтвердит запись в течение 10 минут</p>
@@ -299,12 +300,23 @@
     const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
     try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); } catch (e) {}
     if (tg.isVersionAtLeast && tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes();
-    const u = tg.initDataUnsafe && tg.initDataUnsafe.user;
-    if (u && u.first_name) {
-      document.getElementById('hello').textContent = `Здравствуйте, ${u.first_name}!`;
-      document.getElementById('name').value = [u.first_name, u.last_name].filter(Boolean).join(' ');
-    }
     tg.BackButton.onClick(() => back());
+  }
+
+  /* ---------- Telegram name ---------- */
+  // keyboard-button launches carry no user info, so the bot passes the name in the URL
+  const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  const tgName = (u && [u.first_name, u.last_name].filter(Boolean).join(' ')) || new URLSearchParams(location.search).get('name') || '';
+  const nameInput = document.getElementById('name');
+  const tgNameBtn = document.getElementById('tgName');
+  if (tgName) {
+    document.getElementById('hello').textContent = `Здравствуйте, ${tgName.split(' ')[0]}!`;
+    nameInput.value = tgName;
+    tgNameBtn.style.display = 'none';
+    nameInput.addEventListener('input', () => { tgNameBtn.style.display = nameInput.value.trim() === tgName ? 'none' : ''; });
+    tgNameBtn.onclick = () => { nameInput.value = tgName; tgNameBtn.style.display = 'none'; document.getElementById('fName').classList.remove('err'); haptic('s'); };
+  } else {
+    tgNameBtn.style.display = 'none';
   }
 
   /* ---------- data ---------- */
@@ -552,7 +564,9 @@
       setTimeout(() => {
         try { tg.sendData(JSON.stringify(payload)); }
         catch (e) { document.getElementById('doneSub').textContent = 'Откройте запись через кнопку «Записаться» в чате с ботом'; }
-      }, 2200);
+        // sendData closes the app; if we are still here, the launch did not support it
+        setTimeout(() => { document.getElementById('doneSub').textContent = 'Не удалось отправить заявку. Откройте запись кнопкой «🦷 Записаться на приём» внизу чата.'; }, 2500);
+      }, 1300);
     } else {
       document.getElementById('doneSub').textContent = 'Демо-режим: в Telegram заявка уйдёт в чат с ботом';
     }
