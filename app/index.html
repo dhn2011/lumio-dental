@@ -452,11 +452,20 @@
     const d = new Date(s + 'T00:00');
     return short ? `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}` : `${d.getDate()} ${MONTHS[d.getMonth()]}, ${WD[d.getDay()]}`;
   }
-  // demo: deterministic "busy" slots so the schedule looks real and stays stable
-  function busy(date, time) {
+  // real bookings come from the bot as "doctorIdx-YYMMDD-HHMM" joined by "."
+  const realBusy = new Set((new URLSearchParams(location.search).get('busy') || '').split('.').filter(Boolean));
+  const slotKey = (doc, date, time) => `${doc}-${date.slice(2).replace(/-/g, '')}-${time.replace(':', '')}`;
+  // demo filler: deterministic "busy" slots so the schedule looks lived-in and stays stable
+  function fakeBusy(doc, date, time) {
     let h = 7;
-    for (const ch of date + time + state.doctor + state.service.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    return h % 100 < (state.doctor === ANY ? 18 : 38);
+    for (const ch of date + time + doc) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return h % 100 < 30;
+  }
+  const docBusy = (doc, date, time) => realBusy.has(slotKey(doc, date, time)) || fakeBusy(doc, date, time);
+  function busy(date, time) {
+    return state.doctor === ANY
+      ? state.service.docs.every(d => docBusy(d, date, time))
+      : docBusy(state.doctor, date, time);
   }
   const TIMES = [];
   for (let m = 9 * 60; m <= 20 * 60; m += 30) TIMES.push(`${String(m / 60 | 0).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
@@ -547,6 +556,8 @@
     if (name.length < 2) { document.getElementById('fName').classList.add('err'); bad = true; }
     if (digits.length !== 12) { document.getElementById('fPhone').classList.add('err'); bad = true; }
     if (bad) { haptic('n', 'error'); return; }
+    // "any doctor" becomes a concrete free doctor so the slot is really taken
+    if (state.doctor === ANY) state.doctor = state.service.docs.find(d => !docBusy(d, state.date, state.time));
 
     const payload = {
       service: state.service.name, price: state.service.price,
