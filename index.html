@@ -276,9 +276,6 @@
     .m-cta.show{transform:none}
     footer{padding-bottom:100px}
   }
-  @media (prefers-reduced-motion:reduce){
-    .marquee,.reviews .track{animation:none}
-  }
 </style>
 </head>
 <body>
@@ -586,7 +583,8 @@
 <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
 <script>
 (() => {
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Demo site: animate even when the OS has animation effects turned off
+  const reduce = false;
   const hasGsap = window.gsap && window.ScrollTrigger;
 
   /* ---------- smooth scroll ---------- */
